@@ -1,0 +1,349 @@
+<!-- frontend/mapa_dinosaurios.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Mapa Mundial de Dinosaurios - Taxodino</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="static/css/stylee.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="icon" type="image/png" href="static/img/favicon/favicon-96x96.png" sizes="96x96" />
+    <style>
+        /* Estilos específicos para el mapa */
+        .map-container {
+            position: relative;
+            width: 100%;
+            margin: 0 auto;
+        }
+        
+        #map { 
+            height: 500px; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
+            margin-bottom: 1rem;
+            position: relative;
+            z-index: 1;
+        }
+        
+        /* Prevenir que el mapa capture el scroll de la página */
+        #map * {
+            touch-action: pan-x pan-y; /* Mejorar touch en móviles */
+        }
+        
+        .dinosaur-info { 
+            background: rgba(255,255,255,0.95); 
+            border-radius: 10px; 
+            padding: 15px; 
+            margin-top: 20px; 
+            max-height: 400px; 
+            overflow-y: auto; 
+            position: relative;
+            z-index: 1;
+        }
+        
+        .dinosaur-card { 
+            border-left: 4px solid #ff6b35; 
+            margin-bottom: 10px; 
+            padding: 10px; 
+            transition: transform 0.3s; 
+            background: white; 
+            border-radius: 8px; 
+        }
+        
+        .dinosaur-card:hover { 
+            transform: translateX(5px); 
+            background: #f0f0f0; 
+        }
+        
+        .loading { 
+            text-align: center; 
+            padding: 20px; 
+            display: none; 
+        }
+        
+        .country-selector { 
+            margin: 20px 0; 
+            padding: 15px; 
+            background: #f8f9fa; 
+            border-radius: 10px; 
+            position: relative;
+            z-index: 2;
+        }
+        
+        select { 
+            padding: 10px; 
+            font-size: 16px; 
+            border-radius: 5px; 
+            border: 1px solid #ddd; 
+            width: 100%; 
+            max-width: 300px; 
+        }
+        
+        .map-header h1 { 
+            color: #2D4A22; 
+            margin-bottom: 0.5rem; 
+        }
+        
+        .map-header p { 
+            color: #8B5A2B; 
+            margin-bottom: 1rem; 
+        }
+        
+        /* Evitar que el navbar se superponga al mapa en móviles */
+        @media (max-width: 768px) {
+            #map {
+                height: 350px;
+            }
+            
+            .country-selector {
+                margin: 10px 0;
+                padding: 10px;
+            }
+            
+            .dinosaur-info {
+                max-height: 300px;
+            }
+        }
+        
+        /* Asegurar que el mapa no interfiera con el scroll */
+        .leaflet-container {
+            cursor: grab;
+        }
+        
+        .leaflet-container:active {
+            cursor: grabbing;
+        }
+    </style>
+</head>
+<body>
+
+<nav class="navbar">
+    <div class="navbar-container">
+        <a href="index.html" class="navbar-brand">
+            <img src="static/img/dilophosaurus.png" alt="Dinosaurio">
+            <h1>Taxodino</h1>
+        </a>
+        <div class="nav-links">
+            <a href="index.html" class="nav-link">
+                <i class="fas fa-home"></i> <span>Inicio</span>
+            </a>
+            <a href="mapa_dinosaurios.html" class="nav-link">
+                <i class="fas fa-map-marked-alt"></i> <span>Mapa</span>
+            </a>
+            <a href="favoritos.html" class="nav-link">
+                <i class="fas fa-heart"></i> <span>Favoritos</span>
+            </a>
+            <div class="user-menu" id="userMenu">
+                <div class="user-menu-trigger" id="userMenuTrigger">
+                    <i class="fas fa-user-circle"></i>
+                    <span id="userNameDisplay">Mi Cuenta</span>
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+                <div class="user-dropdown" id="userDropdown"></div>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<div id="dino-bg-container"></div>
+
+<main class="main-content">
+    <div style="width: 100%; max-width: 1200px; margin: 0 auto;">
+        <div class="map-header">
+            <h1><i class="fas fa-map-marked-alt"></i> Mapa Mundial de Dinosaurios</h1>
+            <p>Descubre qué dinosaurios habitaron cada región del planeta</p>
+        </div>
+
+        <div class="country-selector">
+            <label for="pais"><i class="fas fa-globe-americas"></i> Selecciona un país:</label>
+            <select id="pais">
+                <option value="">-- Elige un país --</option>
+            </select>
+        </div>
+
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
+
+        <div id="loading" class="loading">
+            <p><i class="fas fa-spinner fa-spin"></i> Cargando dinosaurios...</p>
+        </div>
+
+        <div id="dinosaur-info" class="dinosaur-info">
+            <h3><i class="fas fa-dragon"></i> 🦕 Dinosaurios encontrados</h3>
+            <div id="dinosaur-list">
+                <p><i class="fas fa-info-circle"></i> Selecciona un país en el mapa o en la lista para ver los dinosaurios que habitaron allí.</p>
+            </div>
+        </div>
+    </div>
+</main>
+
+<footer>
+    <div class="footer-content">
+        <p>© 2026 Dino Explorers - Todos los derechos reservados</p>
+        <!-- <div class="footer-icons">
+            <i class="fab fa-facebook"></i>
+            <i class="fab fa-twitter"></i>
+            <i class="fab fa-instagram"></i>
+            <i class="fab fa-tiktok"></i>
+        </div> -->
+    </div>
+</footer>
+
+<script src="static/js/config.js"></script>
+<script src="static/js/menu-usuario.js"></script>
+<script>
+    let map;
+    let currentMarker = null;
+
+    function initMap() {
+        // Inicializar el mapa con opciones para prevenir problemas de scroll
+        map = L.map('map', {
+            scrollWheelZoom: true,      // Permitir zoom con scroll DENTRO del mapa
+            wheelPxPerZoomLevel: 120,   // Sensibilidad del zoom
+            zoomControl: true,          // Mostrar controles de zoom
+            touchZoom: true,            // Permitir zoom táctil
+            dragging: true,             // Permitir arrastrar
+            bounceAtZoomLimits: false   // Evitar rebote en límites
+        }).setView([20, 0], 2);
+        
+        // Añadir capa de mapa
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CartoDB</a>',
+            subdomains: 'abcd',
+            maxZoom: 19,
+            minZoom: 2
+        }).addTo(map);
+        
+        // Prevenir que el scroll del mapa afecte al scroll de la página
+        // cuando el cursor está dentro del mapa
+        const mapContainer = document.getElementById('map');
+        
+        mapContainer.addEventListener('wheel', function(e) {
+            // Detener propagación del evento de scroll cuando está dentro del mapa
+            e.stopPropagation();
+        }, { passive: false });
+        
+        // También manejar touch events para móviles
+        mapContainer.addEventListener('touchmove', function(e) {
+            // Permitir scroll normal si el mapa no está siendo interactuado
+            if (!map._dragging.enabled()) {
+                return;
+            }
+        }, { passive: false });
+        
+        cargarPaises();
+    }
+
+    async function cargarPaises() {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/v1/geografia/paises`);
+            if (!response.ok) throw new Error('Error al cargar países');
+            const paises = await response.json();
+            const select = document.getElementById('pais');
+            select.innerHTML = '<option value="">-- Elige un país --</option>';
+            
+            paises.forEach(pais => {
+                const option = document.createElement('option');
+                option.value = pais.toLowerCase();
+                option.textContent = pais;
+                select.appendChild(option);
+            });
+            
+            // Agregar event listener después de cargar países
+            document.getElementById('pais').addEventListener('change', cargarDinosaurios);
+        } catch (error) {
+            console.error('Error cargando países:', error);
+            const dinosaurList = document.getElementById('dinosaur-list');
+            if (dinosaurList) {
+                dinosaurList.innerHTML = '<p style="color: #e74c3c;"><i class="fas fa-exclamation-triangle"></i> Error al cargar países. Intenta de nuevo.</p>';
+            }
+        }
+    }
+
+    async function cargarDinosaurios() {
+        const paisSelect = document.getElementById('pais');
+        const pais = paisSelect.value;
+        if (!pais) {
+            // Limpiar la lista si no hay país seleccionado
+            const dinosaurList = document.getElementById('dinosaur-list');
+            if (dinosaurList) {
+                dinosaurList.innerHTML = '<p><i class="fas fa-info-circle"></i> Selecciona un país para ver los dinosaurios que habitaron allí.</p>';
+            }
+            return;
+        }
+
+        const loading = document.getElementById('loading');
+        const dinosaurList = document.getElementById('dinosaur-list');
+        loading.style.display = 'block';
+        dinosaurList.innerHTML = '<p><i class="fas fa-spinner fa-spin"></i> Cargando dinosaurios...</p>';
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/v1/geografia/dinosaurios/${encodeURIComponent(pais)}`);
+            if (!response.ok) throw new Error('Error al cargar dinosaurios');
+            const data = await response.json();
+
+            // Limpiar marcador anterior si existe
+            if (currentMarker) {
+                map.removeLayer(currentMarker);
+            }
+
+            // Agregar nuevo marcador
+            const coords = data.coordenadas;
+            if (coords && coords.lat && coords.lng) {
+                currentMarker = L.marker([coords.lat, coords.lng]).addTo(map)
+                    .bindPopup(`
+                        <b>${escapeHtml(data.pais)}</b><br>
+                        🦕 ${data.dinosaurios.length} dinosaurio(s) encontrado(s)
+                    `)
+                    .openPopup();
+                map.setView([coords.lat, coords.lng], 5);
+            }
+
+            mostrarDinosaurios(data.dinosaurios, data.pais);
+        } catch (error) {
+            console.error('Error:', error);
+            dinosaurList.innerHTML = '<p style="color: #e74c3c;"><i class="fas fa-exclamation-triangle"></i> Error al cargar los dinosaurios. Intenta de nuevo.</p>';
+        } finally {
+            loading.style.display = 'none';
+        }
+    }
+
+    function mostrarDinosaurios(dinosaurios, pais) {
+        const container = document.getElementById('dinosaur-list');
+        if (!dinosaurios || dinosaurios.length === 0) {
+            container.innerHTML = `<p><i class="fas fa-search"></i> No se encontraron registros de dinosaurios en ${escapeHtml(pais)}.</p>`;
+            return;
+        }
+        
+        let html = `<h4><i class="fas fa-dragon"></i> 🦕 ${dinosaurios.length} dinosaurio(s) encontrado(s) en ${escapeHtml(pais)}:</h4>`;
+        dinosaurios.forEach(dino => {
+            html += `
+                <div class="dinosaur-card">
+                    <strong>🦖 ${escapeHtml(dino.nombre || dino.nombre_cientifico || 'Desconocido')}</strong><br>
+                    ${dino.nombre_cientifico ? `<em>${escapeHtml(dino.nombre_cientifico)}</em><br>` : ''}
+                    ${dino.periodo ? `<span class="dino-badge"><i class="fas fa-clock"></i> Período: ${escapeHtml(dino.periodo)}</span><br>` : ''}
+                    ${dino.dieta ? `<span class="dino-badge"><i class="fas fa-utensils"></i> Dieta: ${escapeHtml(dino.dieta)}</span><br>` : ''}
+                    ${dino.descripcion ? `<small><i class="fas fa-info-circle"></i> ${escapeHtml(dino.descripcion.substring(0, 150))}${dino.descripcion.length > 150 ? '...' : ''}</small>` : ''}
+                </div>`;
+        });
+        container.innerHTML = html;
+    }
+    
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Inicializar cuando la página esté completamente cargada
+    window.addEventListener('load', function() {
+        initMap();
+    });
+</script>
+</body>
+</html>
